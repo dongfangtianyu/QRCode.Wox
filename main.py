@@ -4,6 +4,7 @@
 from wox import Wox, WoxAPI
 import os
 import sys
+import shutil
 import hashlib
 import logging
 
@@ -27,43 +28,41 @@ def md5(value):
 
 
 class WoxQRcode(Wox):
+    request_query = ''
+    plugin_ico = "Images/pic.png"
 
     def __init__(self):
         logging.debug("sys.argv: %s" % sys.argv[1])
+
         self.plugin_path = os.path.dirname(os.path.realpath(__file__))
         self.img_path = os.path.join(self.plugin_path, '.cahe')
         if not os.path.exists(self.img_path):
             os.mkdir(self.img_path)
+
         logging.debug("Im runing,plugin_path is '%s' , img_path is '%s'" % (self.plugin_path ,self.img_path))
 
         super(WoxQRcode, self).__init__()
 
-    def query(self, query):
-        logging.debug("method:query, parameters:%s " % query)
+    def query(self, request_query):
+        logging.debug("method:query, parameters:%s " % request_query)
 
+        self.request_query = request_query
         results = []
-        if HAS_QRCODE is not True:
-            results.append({
-                "Title": "Mak QR Code",
-                "SubTitle": "ERROR: Can Not Import Module: qrcode ",
-                "IcoPath":"Images/app.ico",
-            })
-        else:
-            results.append({
-                "Title": "Mak QR Code",
-                "SubTitle": "Context: {}".format(query),
-                "IcoPath": "Images/app.ico",
-                "JsonRPCAction": {
-                    "method": "makeQRImage",
-                    "parameters": [query],
-                    "dontHideAfterAction": True}
+        if request_query in 'clean':
+            # clean cache img
+            results.append(self.get_result('CLEAN_IMAGE_CACHE', request_query))
 
-            })
+        if HAS_QRCODE is not True:
+            # if not has qrcode module , plugin can not work
+            results.append(self.get_result('NOT_HAS_QRCODE_MODULE', request_query))
+
+        else:
+            results.append(self.get_result('MAKE_QRCODE', request_query))
 
         logging.debug("results = %s" % results)
         return results
 
-    def makeQRImage(self, context):
+    def make_qr_image(self, context):
         logging.debug("starting make QRImage...")
 
         QRImageName = "qrcode_{}.jpg".format(md5(context))
@@ -80,16 +79,52 @@ class WoxQRcode(Wox):
         else:
             logging.debug("has cache, use cache image")
         # Wox输入框可能会遮挡二维码
-        # WoxAPI.hide_app()
-        # WoxAPI.change_query(['111'])
-        return self.showQRImage(QRImagePath)
+        WoxAPI.hide_app()
+        return self.show_image(QRImagePath)
 
-    def showQRImage(self, QRImagePath):
+    def show_image(self, QRImagePath):
         logging.debug("starting show QRImage...")
+
         os.startfile(QRImagePath)
 
         logging.debug("show QRImage end")
 
+    def clean_cache(self, contest):
+        shutil.rmtree(self.img_path)
+        WoxAPI.show_msg("Success", " clean up cache file done", self.plugin_ico)
 
+    # messgae
+    def get_result(self, key, request_query):
+        messages = {
+            'CLEAN_IMAGE_CACHE': {
+                "Title": "Clean Cache",
+                "SubTitle": "input 'clean', can clean this plugin cache",
+                "IcoPath": self.plugin_ico,
+                "JsonRPCAction": {
+                    "method": "clean_cache",
+                    "parameters": [request_query],
+                    "dontHideAfterAction": True
+                }
+            },
+
+            'NOT_HAS_QRCODE_MODULE': {
+                "Title": "ERROR: ",
+                "SubTitle": "Can Not Import Module: qrcode ",
+                "IcoPath": self.plugin_ico,
+            },
+
+            'MAKE_QRCODE': {
+                "Title": "Mak QR Code",
+                "SubTitle": "Context: {}".format(request_query),
+                "IcoPath": self.plugin_ico,
+                "JsonRPCAction": {
+                    "method": "make_qr_image",
+                    "parameters": [request_query],
+                    "dontHideAfterAction": False
+                }
+            }
+        }
+
+        return messages.get(key, {"Title": "Mak QR Code", "SubTitle": "Context: {}".format(request_query)})
 if __name__ == "__main__":
     WoxQRcode()
