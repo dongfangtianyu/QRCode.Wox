@@ -15,15 +15,15 @@ logging.basicConfig(level=logging.WARNING,
                     filemode='w')
 try:
     import qrcode
-    import Image
+    from PIL import Image
     HAS_QRCODE = True
-except Exception, e:
+except Exception as e:
     HAS_QRCODE = False
 
 
 def md5(value):
     m = hashlib.md5()
-    m.update(value)
+    m.update(str(value).encode("utf-8"))
     return m.hexdigest()
 
 
